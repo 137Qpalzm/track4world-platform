@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Cache
+.cache/
+
+# Track4World repo (13GB, has its own git repo)
+Track4World/
+
+# Large binary results
+stage1_results/**/*.ply
+stage1_results/**/*.npy
+stage1_results/**/*.mp4
+stage1_results/**/*.jpg
+
+# Conda/env
+*.egg-info/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Temp
+*.tmp

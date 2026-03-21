@@ -1,0 +1,71 @@
+{
+  "env": {
+    "status": "OK",
+    "errors": [],
+    "t4w_python": "E:\\Conda\\envs\\track4world\\python.exe",
+    "python": "3.11.15",
+    "pytorch": "2.5.1+cu121",
+    "cuda_available": true,
+    "gpu_name": "NVIDIA GeForce RTX 3050 Laptop GPU",
+    "gpu_vram_gb": 4.0,
+    "deps": {
+      "timm": "1.0.25",
+      "einops": "0.8.1",
+      "gradio": "5.49.1",
+      "viser": "1.0.15",
+      "open3d": "0.18.0",
+      "transformers": "4.57.3",
+      "sam2": "OK"
+    },
+    "checkpoints": {
+      "track4world_da3.pth": "5.15 GB",
+      "track4world_pi3.pth": "4.94 GB",
+      "track4world_moge.pth": "1.70 GB"
+    },
+    "demo_video": "D:\\桌面\\文件\\毕设2\\Track4World\\demo_data\\cat.mp4"
+  },
+  "results": [
+    {
+      "mode": "2d",
+      "success": true,
+      "elapsed_time": 195.98,
+      "max_frames": 20,
+      "image_size": 320,
+      "output_dir": "D:\\桌面\\文件\\毕设2\\stage1_results\\2d",
+      "fps": 0.1,
+      "output_files": {
+        "ply": 0,
+        "npy": 0,
+        "jpg": 20
+      }
+    },
+    {
+      "mode": "3d_ff",
+      "success": true,
+      "elapsed_time": 63.29,
+      "max_frames": 10,
+      "image_size": 448,
+      "output_dir": "D:\\桌面\\文件\\毕设2\\stage1_results\\3d_ff",
+      "fps": 0.16,
+      "output_files": {
+        "ply": 20,
+        "npy": 12,
+        "jpg": 0
+      }
+    },
+    {
+      "mode": "3d_efep",
+      "success": true,
+      "elapsed_time": 48.22,
+      "max_frames": 10,
+      "image_size": 448,
+      "output_dir": "D:\\桌面\\文件\\毕设2\\stage1_results\\3d_efep",
+      "fps": 0.21,
+      "output_files": {
+        "ply": 19,
+        "npy": 13,
+        "jpg": 0
+      }
+    }
+  ]
+}

@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Track4World 阶段一成果报告</title>
+<style>
+body { font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; max-width: 1100px; margin: 0 auto; padding: 20px; background: #0f0f1a; color: #e0e0e0; }
+h1 { color: #6ec6ff; border-bottom: 3px solid #3d5afe; padding-bottom: 10px; }
+h2 { color: #82b1ff; margin-top: 35px; }
+h3 { color: #b0bec5; }
+.card { background: #1a1a2e; border-radius: 10px; padding: 22px; margin: 15px 0; box-shadow: 0 4px 12px rgba(0,0,0,0.4); border: 1px solid #2a2a4a; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid #333; padding: 10px 14px; text-align: left; }
+th { background: #1a237e; color: #bbdefb; }
+tr:nth-child(even) { background: #1e1e3a; }
+.ok { color: #66bb6a; font-weight: bold; }
+.fail { color: #ef5350; font-weight: bold; }
+img { max-width: 100%; border-radius: 6px; border: 1px solid #333; }
+code { background: #263238; padding: 2px 6px; border-radius: 3px; color: #80cbc4; }
+.code { background: #0d1117; color: #79c0ff; padding: 16px; border-radius: 8px; overflow-x: auto; font-family: 'Cascadia Code', Consolas, monospace; font-size: 0.88em; white-space: pre-wrap; border: 1px solid #21262d; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+.grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+.caption { color: #90a4ae; font-size: 0.85em; text-align: center; margin-top: 5px; }
+.tag { display: inline-block; background: #3d5afe; color: white; padding: 3px 10px; border-radius: 4px; font-size: 0.8em; }
+.section-desc { color: #b0bec5; margin: 8px 0 15px 0; line-height: 1.6; }
+a { color: #64b5f6; }
+</style>
+</head>
+<body>
+
+<h1>Track4World 模型复现 — 阶段一成果报告</h1>
+<p style="color:#90a4ae">面向具身数据采集场景的关键点追踪系统的设计与实现</p>
+
+<!-- ===== 1. 环境 ===== -->
+<h2>1. 运行环境</h2>
+<div class="card">
+<table>
+<tr><th>项目</th><th>值</th><th>状态</th></tr>
+<tr><td>conda 环境</td><td><code>E:\Conda\envs\track4world\python.exe</code></td><td class="ok">OK</td></tr>
+<tr><td>Python</td><td>3.11.15</td><td class="ok">OK</td></tr>
+<tr><td>PyTorch</td><td>2.5.1+cu121</td><td class="ok">OK</td></tr>
+<tr><td>CUDA</td><td>可用</td>
+    <td class="ok">OK</td></tr>
+<tr><td>GPU</td><td>NVIDIA GeForce RTX 3050 Laptop GPU</td><td>4.0 GB VRAM</td></tr>
+</table>
+
+<h3>依赖库</h3>
+<table>
+<tr><th>库</th><th>版本</th><th>用途</th></tr><tr><td>timm</td><td class="ok">1.0.25</td><td>PyTorch Image Models (骨干网络)</td></tr>
+<tr><td>einops</td><td class="ok">0.8.1</td><td>张量操作工具</td></tr>
+<tr><td>gradio</td><td class="ok">5.49.1</td><td>Web UI 框架</td></tr>
+<tr><td>viser</td><td class="ok">1.0.15</td><td>3D 点云可视化</td></tr>
+<tr><td>open3d</td><td class="ok">0.18.0</td><td>点云处理与渲染</td></tr>
+<tr><td>transformers</td><td class="ok">4.57.3</td><td>HuggingFace 模型加载</td></tr>
+<tr><td>sam2</td><td class="ok">OK</td><td>Segment Anything 2 (动态分割)</td></tr>
+</table>
+</div>
+
+<!-- ===== 2. 推理性能 ===== -->
+<h2>2. 推理性能</h2>
+<div class="card">
+<p class="section-desc">使用 demo_data/cat.mp4 测试视频, RTX 3050 (4GB) 上的推理性能:</p>
+<table><tr><th>模式</th><th>帧数</th><th>分辨率</th><th>推理耗时</th><th>PLY</th><th>NPY</th><th>状态</th></tr>
+<tr><td><b>2d</b></td><td>20</td><td>320px</td><td>195.98s</td><td>0</td><td>0</td><td class="ok">成功</td></tr>
+<tr><td><b>3d_ff</b></td><td>10</td><td>448px</td><td>63.29s</td><td>20</td><td>12</td><td class="ok">成功</td></tr>
+<tr><td><b>3d_efep</b></td><td>10</td><td>448px</td><td>48.22s</td><td>19</td><td>13</td><td class="ok">成功</td></tr>
+</table>
+<p style="margin-top:10px; color:#ffab40"><b>注意:</b> 4GB VRAM 限制下, 3D 模式需使用
+<code>camera_base</code> + <code>track4world_moge.pth</code> (1.7GB)。DA3/Pi3 大模型 (&gt;5GB) 会 OOM。</p>
+</div>
+
+<h2>3. 2D 像素追踪</h2>
+<div class="card">
+<p><span class="tag">模式: 2d</span></p>
+<p class="section-desc">追踪视频中每个像素的运动轨迹。颜色编码表示像素在首帧中的位置 — 当物体移动时,
+其颜色与背景产生差异, 从而可视化运动区域。</p>
+
+<h3>运动区域追踪</h3>
+<p>背景保持原始视频, <b>仅运动区域</b>叠加追踪颜色 (黄色轮廓标记运动边界):</p>
+<div style="text-align:center; margin: 15px 0">
+<img src="2d/2d_tracking_motion.gif" style="max-width:500px; border: 2px solid #3d5afe">
+</div>
+
+<h3>原始输出对比</h3>
+<p>左: 原始视频 | 右: 全像素追踪颜色编码</p>
+<div style="text-align:center; margin: 15px 0">
+<img src="2d/2d_tracking_demo.gif" style="max-width:600px">
+</div>
+<h3>关键帧</h3>
+<div class="grid3">
+<div><img src="2d\2d_motion_frame_000.png"><p class="caption">帧 000</p></div>
+<div><img src="2d\2d_motion_frame_005.png"><p class="caption">帧 005</p></div>
+<div><img src="2d\2d_motion_frame_010.png"><p class="caption">帧 010</p></div>
+<div><img src="2d\2d_motion_frame_015.png"><p class="caption">帧 015</p></div>
+<div><img src="2d\2d_motion_frame_019.png"><p class="caption">帧 019</p></div>
+</div>
+</div>
+
+<h2>4. 3D 首帧追踪 (3d_ff)</h2>
+<div class="card">
+<p><span class="tag">模式: 3d_ff</span></p>
+<p class="section-desc">
+<b>原理:</b> 对首帧进行深度估计, 反投影到 3D 空间。然后通过 2D 光流追踪每个像素在后续帧的运动,
+结合几何约束更新 3D 坐标。<br>
+<b>输出:</b> 每帧一个 PLY 点云 (带 RGB 颜色) + 场景流点云 + 相机位姿。
+</p>
+<h3>点云渲染 (Open3D 离屏渲染)</h3>
+<div class="grid3">
+<div><img src="3d_ff\pointcloud_frame_000.png"><p class="caption">3D Reconstruction (Frame 0) (140,085 点)</p></div>
+<div><img src="3d_ff\pointcloud_frame_009.png"><p class="caption">3D Reconstruction (Frame 9) (140,125 点)</p></div>
+<div><img src="3d_ff\pointcloud_flow_000.png"><p class="caption">Scene Flow Visualization (140,030 点)</p></div>
+</div>
+
+<h3>输出文件</h3>
+<table>
+<tr><th>文件</th><th>格式</th><th>内容</th></tr>
+<tr><td><code>frame_*.ply</code></td><td>PLY 点云</td><td>每帧 3D 重建点云 (顶点带 RGB)</td></tr>
+<tr><td><code>flow_*.ply</code></td><td>PLY 点云</td><td>场景流投影 (光流追踪后的 3D 位置)</td></tr>
+<tr><td><code>all_points.npy</code></td><td>NumPy</td><td>所有帧 3D 坐标堆叠 (T, H&times;W, 3)</td></tr>
+<tr><td><code>vis_*.npy</code></td><td>NumPy</td><td>每帧可见性置信度</td></tr>
+<tr><td><code>c2w.npy</code></td><td>NumPy</td><td>Camera-to-World 变换矩阵 (T, 4, 4)</td></tr>
+</table>
+</div>
+
+<h2>5. 3D 全像素全帧追踪 (3d_efep)</h2>
+<div class="card">
+<p><span class="tag">模式: 3d_efep</span></p>
+<p class="section-desc">
+<b>原理:</b> 对<b>每一帧</b>独立进行深度估计和 3D 重建, 然后通过光流建立帧间 3D 对应关系,
+生成完整的 <b>4D 密集点云轨迹</b>。比 3d_ff 更精确但更慢。<br>
+<b>适用:</b> 动态场景、需要高精度 3D 追踪的具身数据采集任务。
+</p>
+<h3>点云渲染</h3>
+<div class="grid3">
+<div><img src="3d_efep\pointcloud_frame_000.png"><p class="caption">3D Reconstruction (Frame 0) (140,119 点)</p></div>
+<div><img src="3d_efep\pointcloud_frame_009.png"><p class="caption">3D Reconstruction (Frame 9) (140,136 点)</p></div>
+<div><img src="3d_efep\pointcloud_flow_000.png"><p class="caption">Scene Flow Visualization (140,119 点)</p></div>
+</div>
+
+<h3>3d_ff vs 3d_efep 对比</h3>
+<table>
+<tr><th>特性</th><th>3d_ff (首帧追踪)</th><th>3d_efep (全像素全帧)</th></tr>
+<tr><td>深度估计</td><td>仅首帧</td><td>每帧独立估计</td></tr>
+<tr><td>3D 精度</td><td>依赖首帧质量, 远帧误差累积</td><td>逐帧独立, 精度更高</td></tr>
+<tr><td>核心输出</td><td>all_points.npy (首帧投影)</td><td>trajectory_all_pointmap.npy (4D轨迹)</td></tr>
+<tr><td>速度</td><td>较快 (一次几何计算)</td><td>较慢 (逐帧计算)</td></tr>
+<tr><td>典型场景</td><td>静态场景预览</td><td>动态场景、精确具身追踪</td></tr>
+</table>
+</div>
+
+<h2>6. 交互式 3D 点云可视化</h2>
+<div class="card">
+<p class="section-desc">使用 Viser 在浏览器中交互查看 3D 点云动画 (支持旋转、缩放、播放)。</p>
+
+<h3>方式一: 简化版查看器 (推荐)</h3>
+<div class="code">cd "D:\桌面\文件\毕设2"
+E:/Conda/envs/track4world/python.exe simple_viewer.py --mode 3d_ff
+# 浏览器打开 http://localhost:8012
+# 如果加载慢, 可加大降采样: --downsample 8</div>
+
+<h3>方式二: 原始可视化脚本</h3>
+<div class="code">cd "D:\桌面\文件\毕设2\Track4World"
+E:/Conda/envs/track4world/python.exe visualization/vis_3d_ff.py --ply_dir results/cat_3dff_base/3d_ff_output
+# 浏览器打开 http://localhost:8080</div>
+
+<h3>方式三: MeshLab (单帧静态查看)</h3>
+<p>直接双击 <code>.ply</code> 文件即可用 MeshLab 打开。<a href="https://www.meshlab.net/#download">下载 MeshLab</a></p>
+
+<h3>常见问题</h3>
+<table>
+<tr><th>问题</th><th>解决方法</th></tr>
+<tr><td>浏览器一直 "连接中"</td><td>等待 10-30 秒 (首次加载点云数据); 尝试刷新; 使用 Chrome</td></tr>
+<tr><td>页面空白 / 无点云</td><td>用简化版查看器 (自动降采样); 或加 <code>--downsample 8</code></td></tr>
+<tr><td>No module named 'open3d'</td><td>必须使用 track4world 环境的 Python, 不是系统 Python</td></tr>
+</table>
+</div>
+
+<h2>7. 完整使用命令</h2>
+<div class="card">
+<h3>2D 追踪</h3>
+<div class="code">cd Track4World
+E:/Conda/envs/track4world/python.exe demo.py \
+  --mp4_path demo_data/cat.mp4 --mode 2d \
+  --image_size 320 --max_frames 20</div>
+
+<h3>3D 首帧追踪 (4GB VRAM 可用)</h3>
+<div class="code">cd Track4World
+E:/Conda/envs/track4world/python.exe demo.py \
+  --mp4_path demo_data/cat.mp4 --mode 3d_ff \
+  --coordinate camera_base \
+  --ckpt_init checkpoints/track4world_moge.pth \
+  --image_size 448 --max_frames 10</div>
+
+<h3>3D 全像素追踪</h3>
+<div class="code">cd Track4World
+E:/Conda/envs/track4world/python.exe demo.py \
+  --mp4_path demo_data/cat.mp4 --mode 3d_efep \
+  --coordinate camera_base \
+  --ckpt_init checkpoints/track4world_moge.pth \
+  --image_size 448 --max_frames 10</div>
+</div>
+
+<h2>8. 模型架构</h2>
+<div class="card">
+<pre style="font-family: 'Cascadia Code', Consolas, monospace; line-height: 1.6; font-size: 0.85em; color: #a5d6a7;">
+输入: 单目 RGB 视频 (B, T, 3, H, W)
+  │
+  ├─[骨干网络] DINOv2-ViT-L / Pi3X / DA3-Giant
+  │   输出: 3D点图(T,H,W,3) + 流特征(T,128,H/8,W/8) + 相机位姿(T,4,4)
+  │
+  ├─[全局特征聚合] VGGT-style Alternating Attention
+  │   帧级注意力 ⇄ 全局注意力 (2D Rotary Position Embedding)
+  │
+  ├─[RAFT 迭代优化] 滑动窗口 (S=16, stride=8)
+  │   相关性金字塔(5层) → 运动编码 → 2D/3D流更新 ×4次
+  │   Convex Upsampling 8× → 全分辨率
+  │
+  └─[输出]
+      ├─ 2D 光流 (T, 2, H, W) + 可见性 (T, 2, H, W)
+      ├─ 3D 场景流 (T, 3, H, W) + 点云 (T, H, W, 3)
+      └─ 相机位姿 (T, 4, 4) Camera-to-World
+</pre>
+</div>
+
+<footer style="margin-top:40px; padding:20px 0; border-top:1px solid #333; color:#616161; text-align:center;">
+Track4World 模型复现 | 毕业设计 — 面向具身数据采集场景的关键点追踪系统 | 2026-03-21 17:15:58
+</footer>
+</body></html>
