@@ -165,6 +165,40 @@ def launch_viser(output_dir):
     return "Viser 服务器已启动，请在浏览器打开 http://localhost:8080"
 
 
+def load_existing_result(result_dir):
+    """加载已有的推理结果目录（Colab 或本机）"""
+    if not result_dir or not os.path.exists(result_dir):
+        gr.Warning("目录不存在，请检查路径")
+        return None, None, None, "目录不存在"
+
+    from visualize import find_output_video, create_3d_plotly_multi_frame
+
+    # 检测模式
+    mode = None
+    if os.path.exists(os.path.join(result_dir, "2d_output")):
+        mode = "2d"
+    elif os.path.exists(os.path.join(result_dir, "3d_ff_output")):
+        mode = "3d_ff"
+    elif os.path.exists(os.path.join(result_dir, "3d_efep_output")):
+        mode = "3d_efep"
+    else:
+        gr.Warning("未识别到有效的结果目录结构")
+        return None, None, None, "未识别到有效结果"
+
+    vis_video = None
+    plotly_fig = None
+
+    if mode == "2d":
+        vis_video = find_output_video(result_dir, mode)
+    elif mode in ("3d_ff", "3d_efep"):
+        ply_dir = os.path.join(result_dir, f"{mode}_output")
+        if os.path.exists(ply_dir):
+            plotly_fig = create_3d_plotly_multi_frame(ply_dir, num_frames=10)
+
+    status = f"已加载结果: {os.path.basename(result_dir)} (模式: {mode})"
+    return vis_video, plotly_fig, result_dir, status
+
+
 # ============================================================
 # Gradio UI
 # ============================================================
@@ -214,6 +248,15 @@ def build_app():
 
                 run_btn = gr.Button("开始推理", variant="primary", size="lg")
                 status_box = gr.Textbox(label="状态", interactive=False)
+
+                gr.Markdown("---")
+                gr.Markdown("### 加载已有结果")
+                load_result_dir = gr.Textbox(
+                    label="结果目录路径",
+                    placeholder="例: E:/bishe2/Track4World/results/horsejump-high",
+                    info="加载 Colab 或本机已跑完的结果"
+                )
+                load_result_btn = gr.Button("加载结果", size="sm")
 
             # ============ Right: Results ============
             with gr.Column(scale=2):
@@ -296,6 +339,13 @@ def build_app():
             fn=launch_viser,
             inputs=[output_dir_state],
             outputs=[viser_status],
+        )
+
+        # Load existing result
+        load_result_btn.click(
+            fn=load_existing_result,
+            inputs=[load_result_dir],
+            outputs=[result_video, plotly_3d, output_dir_state, status_box],
         )
 
     return app
