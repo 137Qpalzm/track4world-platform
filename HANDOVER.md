@@ -73,13 +73,24 @@
 - [x] 人类抓握数据素材导入（`embodied_data/human_grasp/`）
 - [x] GT 标注对比功能
 - [x] 启动脚本（`启动平台.bat`）
+- [x] Colab 推理环境配置（`colab_inference.ipynb`）
+- [x] 平台"加载已有结果"功能（支持展示 Colab 结果）
+- [x] Colab 成功跑通 2d 模式（50帧 21秒）
 
-### 已知问题（待修复）
-1. **2D 视频浏览器内播放** — cv2 的 mp4v 编码不兼容 HTML5，已改为优先尝试 avc1/H264
-2. **ffprobe 未找到** — Gradio 内部用 ffprobe 检查视频可播放性，bat 已设 PATH 但需验证
-3. **vis_3d_ff.py IndexError** — PLY/NPY 文件数量不匹配时数组越界
-4. **Viser 3D 查看器无画面** — 需 gsplat 依赖，低优先级
-5. **CUDA OOM** — 本机 4GB 显存跑不了大视频，计划用 Colab T4 解决
+### 当前工作流程
+1. **数据推理**：在 Colab 上运行 `colab_inference.ipynb`（Cell 7 可一次跑完所有模式）
+2. **结果下载**：Cell 6 打包下载 zip，解压到 `Track4World/results/`
+3. **平台展示**：启动平台，用"加载已有结果"输入目录路径查看
+
+### 后续计划（优先级从高到低）
+1. **2D 可视化优化** — 背景保持原始视频，仅将人物/物体轨迹渲染为彩色像素图
+2. **4D 场景展示** — 时空轨迹的交互式可视化
+3. **Viser 3D 点云查看器修复** — 解决无画面问题（需 gsplat 依赖）
+4. **vis_3d_ff.py IndexError 修复** — PLY/NPY 数量不匹配时的数组越界
+
+### 已知问题（低优先级）
+- ffprobe 路径问题（Gradio 内部调用，不影响核心功能）
+- 本机 4GB 显存限制（已通过 Colab 解决）
 
 ### 启动方式
 双击 `启动平台.bat`，浏览器打开 http://localhost:7860
@@ -139,4 +150,5 @@ $T4W ../platform/app.py
 | `stage2_results/eval_results.md` | 阶段二评估结果 |
 | `Track4World/demo.py` | 模型推理入口 (已修改 float16) |
 | `启动平台.bat` | 一键启动 Gradio 平台 |
+| `colab_inference.ipynb` | Colab 推理 notebook（Cell 7 批量跑所有模式） |
 | `HANDOVER.md` | 本文档 |
