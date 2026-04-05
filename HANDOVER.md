@@ -77,20 +77,35 @@
 - [x] 平台"加载已有结果"功能（支持展示 Colab 结果）
 - [x] Colab 成功跑通 2d 模式（50帧 21秒）
 
-### 当前工作流程
-1. **数据推理**：在 Colab 上运行 `colab_inference.ipynb`（Cell 7 可一次跑完所有模式）
-2. **结果下载**：Cell 6 打包下载 zip，解压到 `Track4World/results/`
-3. **平台展示**：启动平台，用"加载已有结果"输入目录路径查看
+### 当前工作流程（已验证可行）
+
+**Colab 推理**（3D 模式）：
+1. Cell 1: 检查 GPU
+2. Cell 2: 安装依赖 + 自动切换到 `b5bcd5d` 版本（包含内置 utils3d）
+3. Cell 3: 下载权重
+4. Cell 4: 上传视频
+5. Cell 5: 运行 3d_ff 推理（MODE="3d_ff"）
+6. Cell 6: 打包下载结果
+
+**本机推理**（2D 模式）：
+- 启动平台 → 上传视频 → 选择 2d 模式 → 推理
+- 或命令行：`python demo.py --mp4_path 视频.mp4 --mode 2d --image_size 320 --max_frames 20`
+
+**备用方案**（Colab 跑 2D）：
+- Cell 2.5: 切换回新版本（master 分支）
+- Cell 7: 运行 2d 推理（新版本不需要 utils3d.depth_to_points）
+
+### 关键问题已解决
+- ✅ utils3d.depth_to_points 缺失 → 使用 Track4World 内置 utils3d（commit b5bcd5d）
+- ✅ Viser 3D 查看器无画面 → utils3d 修复后点云正常生成，Viser 可显示
+- ✅ Colab numpy 版本冲突 → 强制重装 numpy 1.26.4
+- ✅ 平台加载 Colab 结果 → "加载已有结果"功能已实现
 
 ### 后续计划（优先级从高到低）
-1. **2D 可视化优化** — 背景保持原始视频，仅将人物/物体轨迹渲染为彩色像素图
-2. **4D 场景展示** — 时空轨迹的交互式可视化
-3. **Viser 3D 点云查看器修复** — 解决无画面问题（需 gsplat 依赖）
-4. **vis_3d_ff.py IndexError 修复** — PLY/NPY 数量不匹配时的数组越界
-
-### 已知问题（低优先级）
-- ffprobe 路径问题（Gradio 内部调用，不影响核心功能）
-- 本机 4GB 显存限制（已通过 Colab 解决）
+1. **完善 Colab notebook** — 自动化 utils3d 修复流程，添加 2d 备用方案
+2. **用真实素材跑完整流程** — 人类抓握数据的 2d + 3d_ff 推理
+3. **2D 可视化优化** — 背景保持原始视频，仅轨迹渲染为彩色
+4. **4D 场景展示** — 时空轨迹的交互式可视化
 
 ### 启动方式
 双击 `启动平台.bat`，浏览器打开 http://localhost:7860
