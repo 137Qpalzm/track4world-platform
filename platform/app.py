@@ -115,18 +115,29 @@ def run_tracking(video_path, mode, image_size, max_frames, progress=gr.Progress(
     return vis_video, plotly_fig, results.get('output_dir'), status_text
 
 
-def show_single_frame_3d(output_dir, frame_idx, point_type):
+def show_single_frame_3d(output_dir, frame_idx, point_type, use_motion_seg):
     """Show a single frame's 3D point cloud."""
     if not output_dir:
         return None
-    from visualize import create_3d_plotly
 
     # Determine ply_dir
+    ply_dir = None
     for subdir in ['3d_ff_output', '3d_efep_output']:
-        ply_dir = os.path.join(output_dir, subdir)
-        if os.path.exists(ply_dir):
-            return create_3d_plotly(ply_dir, int(frame_idx), point_type=point_type)
-    return None
+        d = os.path.join(output_dir, subdir)
+        if os.path.exists(d):
+            ply_dir = d
+            break
+
+    if not ply_dir:
+        return None
+
+    # Use motion segmentation if enabled
+    if use_motion_seg:
+        from visualize import create_3d_plotly_with_motion_segmentation
+        return create_3d_plotly_with_motion_segmentation(ply_dir, int(frame_idx))
+    else:
+        from visualize import create_3d_plotly
+        return create_3d_plotly(ply_dir, int(frame_idx), point_type=point_type)
 
 
 def show_annotations():
@@ -165,7 +176,7 @@ def launch_viser(output_dir):
     return "Viser 服务器已启动，请在浏览器打开 http://localhost:8080"
 
 
-def load_existing_result(result_dir):
+def load_existing_result(result_dir, display_mode="auto"):
     """加载已有的推理结果目录（Colab 或本机）"""
     if not result_dir or not os.path.exists(result_dir):
         gr.Warning("目录不存在，请检查路径")
@@ -173,17 +184,22 @@ def load_existing_result(result_dir):
 
     from visualize import find_output_video, create_3d_plotly_multi_frame
 
-    # 检测模式
-    mode = None
-    if os.path.exists(os.path.join(result_dir, "2d_output")):
-        mode = "2d"
-    elif os.path.exists(os.path.join(result_dir, "3d_ff_output")):
-        mode = "3d_ff"
-    elif os.path.exists(os.path.join(result_dir, "3d_efep_output")):
-        mode = "3d_efep"
-    else:
+    # 检测可用模式（优先 efep）
+    available = []
+    for m in ["3d_efep", "3d_ff", "2d"]:
+        subdir = "2d_output" if m == "2d" else f"{m}_output"
+        if os.path.exists(os.path.join(result_dir, subdir)):
+            available.append(m)
+
+    if not available:
         gr.Warning("未识别到有效的结果目录结构")
         return None, None, None, "未识别到有效结果"
+
+    # 选择模式
+    if display_mode == "auto" or display_mode not in available:
+        mode = available[0]  # 优先 efep
+    else:
+        mode = display_mode
 
     vis_video = None
     plotly_fig = None
@@ -195,7 +211,7 @@ def load_existing_result(result_dir):
         if os.path.exists(ply_dir):
             plotly_fig = create_3d_plotly_multi_frame(ply_dir, num_frames=10)
 
-    status = f"已加载结果: {os.path.basename(result_dir)} (模式: {mode})"
+    status = f"已加载: {os.path.basename(result_dir)} | 模式: {mode} | 可用: {', '.join(available)}"
     return vis_video, plotly_fig, result_dir, status
 
 
@@ -256,6 +272,12 @@ def build_app():
                     placeholder="例: E:/bishe2/Track4World/results/horsejump-high",
                     info="加载 Colab 或本机已跑完的结果"
                 )
+                load_mode_dropdown = gr.Dropdown(
+                    choices=["auto", "3d_efep", "3d_ff", "2d"],
+                    value="auto",
+                    label="展示模式",
+                    info="auto = 优先 3d_efep"
+                )
                 load_result_btn = gr.Button("加载结果", size="sm")
 
             # ============ Right: Results ============
@@ -281,6 +303,11 @@ def build_app():
                                 choices=["frame", "flow"],
                                 value="frame",
                                 label="点云类型",
+                            )
+                            motion_seg_check = gr.Checkbox(
+                                label="运动分割（官方效果）",
+                                value=False,
+                                info="背景灰色静止，运动物体彩色轨迹"
                             )
                             refresh_3d_btn = gr.Button("刷新单帧")
 
@@ -323,7 +350,7 @@ def build_app():
         # Refresh single frame 3D
         refresh_3d_btn.click(
             fn=show_single_frame_3d,
-            inputs=[output_dir_state, frame_slider, pt_type],
+            inputs=[output_dir_state, frame_slider, pt_type, motion_seg_check],
             outputs=[plotly_3d],
         )
 
@@ -344,7 +371,7 @@ def build_app():
         # Load existing result
         load_result_btn.click(
             fn=load_existing_result,
-            inputs=[load_result_dir],
+            inputs=[load_result_dir, load_mode_dropdown],
             outputs=[result_video, plotly_3d, output_dir_state, status_box],
         )
 

@@ -121,6 +121,107 @@ def create_3d_plotly(
     return fig
 
 
+def create_3d_plotly_with_motion_segmentation(
+    ply_dir: str,
+    frame_idx: int = 0,
+    max_static_points: int = 30000,
+    max_dynamic_points: int = 20000,
+) -> go.Figure:
+    """
+    Create 3D visualization with motion segmentation (official style).
+
+    Background (static) → gray points, no trajectory
+    Moving objects (dynamic) → colorful trajectory
+
+    Args:
+        ply_dir: Directory containing frame_*.ply, flow_*.ply, pc_dyn_mask_*.npy
+        frame_idx: Which frame to display
+        max_static_points: Max points for static background
+        max_dynamic_points: Max points for dynamic objects
+    """
+    frame_ply = os.path.join(ply_dir, f"frame_{frame_idx:03d}.ply")
+    flow_ply = os.path.join(ply_dir, f"flow_{frame_idx:03d}.ply")
+    mask_npy = os.path.join(ply_dir, f"pc_dyn_mask_{frame_idx:03d}.npy")
+
+    # Check if files exist
+    if not os.path.exists(frame_ply):
+        fig = go.Figure()
+        fig.add_annotation(text="未找到点云文件", showarrow=False, font=dict(size=20))
+        return fig
+
+    # Load frame points (original geometry)
+    pts_frame, cols_frame = load_ply_as_numpy(frame_ply)
+
+    # Load motion mask if available
+    if os.path.exists(mask_npy):
+        mask = np.load(mask_npy).flatten()  # (N,) or (N,1) -> (N,)
+
+        # Ensure mask matches point count
+        if len(mask) != len(pts_frame):
+            # Fallback: no segmentation
+            mask = np.zeros(len(pts_frame), dtype=bool)
+        else:
+            mask = mask > 0.5  # Dynamic mask (True = moving)
+    else:
+        # No mask available, treat all as static
+        mask = np.zeros(len(pts_frame), dtype=bool)
+
+    static_mask = ~mask
+
+    fig = go.Figure()
+
+    # 1. Static background (gray)
+    if static_mask.sum() > 0:
+        pts_static = pts_frame[static_mask]
+        if len(pts_static) > max_static_points:
+            idx = np.random.choice(len(pts_static), max_static_points, replace=False)
+            pts_static = pts_static[idx]
+
+        fig.add_trace(go.Scatter3d(
+            x=pts_static[:, 0], y=pts_static[:, 1], z=pts_static[:, 2],
+            mode='markers',
+            marker=dict(size=1, color='rgb(150,150,150)', opacity=0.3),
+            name="背景（静态）",
+            showlegend=True,
+        ))
+
+    # 2. Dynamic objects (colorful trajectory)
+    if mask.sum() > 0 and os.path.exists(flow_ply):
+        pts_flow, cols_flow = load_ply_as_numpy(flow_ply)
+
+        # Flow PLY should have same point count as frame PLY
+        if len(pts_flow) == len(pts_frame):
+            pts_dynamic = pts_flow[mask]
+            cols_dynamic = cols_flow[mask]
+
+            if len(pts_dynamic) > max_dynamic_points:
+                idx = np.random.choice(len(pts_dynamic), max_dynamic_points, replace=False)
+                pts_dynamic = pts_dynamic[idx]
+                cols_dynamic = cols_dynamic[idx]
+
+            colors_dynamic = [f'rgb({int(r*255)},{int(g*255)},{int(b*255)})'
+                             for r, g, b in cols_dynamic]
+
+            fig.add_trace(go.Scatter3d(
+                x=pts_dynamic[:, 0], y=pts_dynamic[:, 1], z=pts_dynamic[:, 2],
+                mode='markers',
+                marker=dict(size=2, color=colors_dynamic, opacity=0.9),
+                name="运动物体",
+                showlegend=True,
+            ))
+
+    fig.update_layout(
+        scene=dict(
+            xaxis_title='X', yaxis_title='Y', zaxis_title='Z',
+            aspectmode='data',
+        ),
+        margin=dict(l=0, r=0, t=30, b=0),
+        height=600,
+        title=f"3D 点云（运动分割）— 帧 {frame_idx}",
+    )
+    return fig
+
+
 def create_3d_plotly_multi_frame(
     ply_dir: str,
     num_frames: int = 5,
