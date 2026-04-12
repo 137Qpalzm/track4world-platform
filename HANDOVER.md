@@ -104,16 +104,26 @@
 ### 已完成（本次会话）
 - ✅ 平台加载结果优先 3d_efep，并添加模式选择下拉菜单（auto/3d_efep/3d_ff/2d）
 - ✅ visualize.py 新增 `create_3d_plotly_with_motion_segmentation()` — 背景灰色静止，运动物体彩色轨迹
-- ✅ Colab notebook 完善（Cell 7 批量推理，numpy 修复，2d 备用方案）
+- ✅ Colab notebook 完善（Cell 4.5 自动生成背景减除 mask，Cell 2 修复 pi3x 软链接）
+- ✅ Viser 集成运动分割：自动检测 pc_dyn_mask_*.npy 或 mask/*.png，支持动态/静态轨迹过滤
+- ✅ Viser 前端新增"Motion Segmentation"控制面板（All/Dynamic Only/Static Only）
 - ✅ 确认推理与可视化完全分离，修改可视化不需要重跑推理
-- ✅ 确认 3d_ff/3d_efep 模式无需先跑 2d（2d→3d 是模型内部机制）
+- ✅ 确认 3d_efep 模式无需先跑 2d（2d→3d 是模型内部机制）
+- ✅ 确认 3d_efep 输出帧数 = MAX_FRAMES ÷ 5（5:1比例），目标100帧需设 MAX_FRAMES=500
+- ✅ 带 mask 的100帧推理结果已保存：`Track4World/results/human_grasp_3d_efep_masked/`
+
+### 当前数据状态
+- 结果路径：`E:/bishe2/Track4World/results/human_grasp_3d_efep_masked/`
+- 内容：100帧 frame ply + 98帧 flow ply + 616帧输入 mask PNG
+- mask 动态比例：约 1-3%（人物区域，背景减除算法生成）
+- pc_dyn_mask_*.npy：3d_efep 模式不生成此文件，Viser 改为读取 mask/*.png
 
 ### 后续计划（优先级从高到低）
-1. **Colab 跑完整推理** — human_grasp_video0.mp4 全帧（616帧），3d_efep 模式，IMAGE_SIZE=448
-2. **Viser 集成运动分割** — 将背景/动态物体分割展示迁移到 Viser 3D 查看器（替代 Plotly 单帧）
-3. **Viser 前端交互** — 用户手动选择感兴趣的 mask 区域，动态筛选轨迹点
-4. **Viser 修正机制（备选）** — 用户发现数据错误时可手动纠正标注
-5. **真机数据验证** — 机械臂+灵巧手/二指夹爪场景的点追踪验证
+1. **验证 Viser 运动分割效果** — 启动 Viser 查看 human_grasp_3d_efep_masked，切换 Dynamic Only 模式
+2. **Viser 前端交互** — 用户手动框选感兴趣的 mask 区域，动态筛选轨迹点
+3. **Viser 修正机制（备选）** — 用户发现数据错误时可手动纠正标注
+4. **真机数据验证** — 机械臂+灵巧手/二指夹爪场景的点追踪验证
+5. **论文撰写** — 阶段四，待展示平台完善后开始
 
 ### 启动方式
 双击 `启动平台.bat`，浏览器打开 http://localhost:7860
