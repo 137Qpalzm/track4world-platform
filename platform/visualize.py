@@ -252,9 +252,42 @@ def create_3d_plotly_multi_frame(
 
     fig.update_layout(
         scene=dict(aspectmode='data'),
-        margin=dict(l=0, r=0, t=30, b=0),
+        title="多帧3D点云预览",
         height=600,
-        title="多帧 3D 追踪点云",
+    )
+    return fig
+
+
+def create_3d_plotly_from_npy(
+    trajectories: np.ndarray,
+    visibility_mask: np.ndarray,
+    num_frames: int = 10,
+) -> go.Figure:
+    """从编辑后的 .npy 文件生成 Plotly 预览"""
+    import plotly.express as px
+    colors = px.colors.qualitative.Set1
+
+    fig = go.Figure()
+    T, N = trajectories.shape[:2]
+    num_frames = min(num_frames, T)
+
+    for t in range(num_frames):
+        vis = visibility_mask[t]
+        pts = trajectories[t][vis] * 100  # 缩放到世界坐标
+        if len(pts) == 0:
+            continue
+
+        fig.add_trace(go.Scatter3d(
+            x=pts[:, 0], y=pts[:, 1], z=pts[:, 2],
+            mode='markers',
+            marker=dict(size=2, color=colors[t % len(colors)], opacity=0.6),
+            name=f"帧 {t}",
+        ))
+
+    fig.update_layout(
+        scene=dict(aspectmode='data'),
+        title="编辑后轨迹预览（前10帧）",
+        height=600,
     )
     return fig
 

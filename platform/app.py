@@ -166,7 +166,8 @@ def launch_viser(output_dir):
         return "未找到 3D 输出目录"
 
     import subprocess
-    vis_script = str(T4W_ROOT / "visualization" / "vis_3d_ff.py")
+    # 使用world坐标系可视化脚本
+    vis_script = str(T4W_ROOT / "visualization" / "vis_3d_efep_world.py")
     python_exe = sys.executable
 
     subprocess.Popen(
@@ -176,16 +177,70 @@ def launch_viser(output_dir):
     return "Viser 服务器已启动，请在浏览器打开 http://localhost:8080"
 
 
+def launch_open3d(output_dir, frame_idx=0):
+    """Launch Open3D viewer for a single frame."""
+    if not output_dir:
+        return "请先运行 3D 推理"
+
+    ply_dir = None
+    for subdir in ['3d_ff_output', '3d_efep_output']:
+        d = os.path.join(output_dir, subdir)
+        if os.path.exists(d):
+            ply_dir = d
+            break
+
+    if not ply_dir:
+        return "未找到 3D 输出目录"
+
+    import subprocess
+    python_exe = sys.executable
+
+    # 查找指定帧的PLY文件
+    ply_files = sorted([f for f in os.listdir(ply_dir) if f.endswith('.ply')])
+    if not ply_files:
+        return "未找到PLY文件"
+
+    if frame_idx >= len(ply_files):
+        frame_idx = 0
+
+    ply_path = os.path.join(ply_dir, ply_files[frame_idx])
+
+    # 启动Open3D查看器
+    code = f"""
+import open3d as o3d
+pcd = o3d.io.read_point_cloud(r'{ply_path}')
+o3d.visualization.draw_geometries([pcd], window_name='Frame {frame_idx}', width=1280, height=720)
+"""
+
+    subprocess.Popen(
+        [python_exe, "-c", code],
+        cwd=str(T4W_ROOT),
+    )
+    return f"Open3D 已启动，显示第 {frame_idx} 帧"
+
+
 def load_existing_result(result_dir, display_mode="auto"):
     """加载已有的推理结果目录（Colab 或本机）"""
     if not result_dir or not os.path.exists(result_dir):
         gr.Warning("目录不存在，请检查路径")
         return None, None, None, "目录不存在"
 
-    from visualize import find_output_video, create_3d_plotly_multi_frame
+    from visualize import find_output_video, create_3d_plotly_multi_frame, create_3d_plotly_from_npy
 
-    # 检测可用模式（优先 efep）
+    # 检测可用模式（优先 edited > efep > ff > 2d）
     available = []
+
+    # 检测编辑后结果
+    edited_files = [
+        "edited_trajectories.npy",
+        "edited_visibility_mask.npy",
+        "c2w.npy",
+        "static_points.npz"
+    ]
+    if all(os.path.exists(os.path.join(result_dir, f)) for f in edited_files):
+        available.append("3d_edited")
+
+    # 检测原始结果
     for m in ["3d_efep", "3d_ff", "2d"]:
         subdir = "2d_output" if m == "2d" else f"{m}_output"
         if os.path.exists(os.path.join(result_dir, subdir)):
@@ -197,7 +252,7 @@ def load_existing_result(result_dir, display_mode="auto"):
 
     # 选择模式
     if display_mode == "auto" or display_mode not in available:
-        mode = available[0]  # 优先 efep
+        mode = available[0]  # 优先 edited
     else:
         mode = display_mode
 
@@ -206,6 +261,13 @@ def load_existing_result(result_dir, display_mode="auto"):
 
     if mode == "2d":
         vis_video = find_output_video(result_dir, mode)
+    elif mode == "3d_edited":
+        # 编辑后结果：直接从 .npy 文件生成 Plotly 图
+        import numpy as np
+        traj = np.load(os.path.join(result_dir, "edited_trajectories.npy"))
+        mask = np.load(os.path.join(result_dir, "edited_visibility_mask.npy"))
+        # 生成简单的 Plotly 预览（前10帧）
+        plotly_fig = create_3d_plotly_from_npy(traj, mask, num_frames=10)
     elif mode in ("3d_ff", "3d_efep"):
         ply_dir = os.path.join(result_dir, f"{mode}_output")
         if os.path.exists(ply_dir):
@@ -324,6 +386,16 @@ def build_app():
                         viser_btn = gr.Button("启动 Viser 服务器")
                         viser_status = gr.Textbox(label="Viser 状态", interactive=False)
 
+                        gr.Markdown("---")
+                        gr.Markdown("### Open3D 单帧查看")
+                        with gr.Row():
+                            open3d_frame_slider = gr.Slider(
+                                minimum=0, maximum=20, value=0, step=1,
+                                label="选择帧",
+                            )
+                            open3d_btn = gr.Button("启动 Open3D")
+                        open3d_status = gr.Textbox(label="Open3D 状态", interactive=False)
+
         # ============ Event handlers ============
 
         # Preset selection → load video
@@ -366,6 +438,13 @@ def build_app():
             fn=launch_viser,
             inputs=[output_dir_state],
             outputs=[viser_status],
+        )
+
+        # Launch Open3D
+        open3d_btn.click(
+            fn=launch_open3d,
+            inputs=[output_dir_state, open3d_frame_slider],
+            outputs=[open3d_status],
         )
 
         # Load existing result
